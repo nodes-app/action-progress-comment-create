@@ -194,7 +194,7 @@ runs:
                 "updated": $now,
                 "stopped": -1,
                 "error": env.ERROR,
-                "task_format": (if env.TASK_FORMAT == "" then "" else env.TASK_FORMAT end),
+                "task_format": env.TASK_FORMAT,
                 "duration_format": env.DURATION_FORMAT,
                 "duration_estimate_format": env.DURATION_ESTIMATE_FORMAT,
                 "title_in_progress": env.TITLE_IN_PROGRESS,
