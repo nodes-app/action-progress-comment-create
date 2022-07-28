@@ -83,6 +83,10 @@ inputs:
     description: Error to display as part of the failure message
     required: false
     default: An error occurred.
+  close-on-failure:
+    description: Close issue on failure
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -110,6 +114,7 @@ runs:
         STATUS_LABEL_FAILURE: ${{ inputs.status-label-failure }}
         STATUS_LABEL_CANCELLED: ${{ inputs.status-label-cancelled }}
         ERROR: ${{ inputs.error }}
+        CLOSE_ON_FAILURE: ${{ inputs.close-on-failure }}
       run: |
         username=$(gh api -H "Accept: application/vnd.github+json" /user --jq '.login')
         issue=$(gh issue view "$ISSUE_NUMBER" --repo "$REPOSITORY" --json title,comments)
@@ -194,6 +199,7 @@ runs:
                 "updated": $now,
                 "stopped": -1,
                 "error": env.ERROR,
+                "close_on_failure": (env.CLOSE_ON_FAILURE | fromjson),
                 "task_format": env.TASK_FORMAT,
                 "duration_format": env.DURATION_FORMAT,
                 "duration_estimate_format": env.DURATION_ESTIMATE_FORMAT,
