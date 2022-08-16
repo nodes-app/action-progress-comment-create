@@ -120,7 +120,7 @@ runs:
         issue=$(gh issue view "$ISSUE_NUMBER" --repo "$REPOSITORY" --json title,comments)
         title=$(echo "$issue" | jq -r '.title') &
         wait
-        body="$(
+        body=$(
           gh issue list \
             --repo "$REPOSITORY" \
             --json title,number,comments \
