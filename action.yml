@@ -116,9 +116,10 @@ runs:
         ERROR: ${{ inputs.error }}
         AUTO_CLOSE: ${{ inputs.auto-close }}
       run: |
-        username=$(gh api -H "Accept: application/vnd.github+json" /user --jq '.login')
+        username=$(gh api -H "Accept: application/vnd.github+json" /user --jq '.login') &
         issue=$(gh issue view "$ISSUE_NUMBER" --repo "$REPOSITORY" --json title,comments)
-        title=$(echo "$issue" | jq -r '.title')
+        title=$(echo "$issue" | jq -r '.title') &
+        wait
         body="$(
           gh issue list \
             --repo "$REPOSITORY" \
@@ -312,14 +313,6 @@ runs:
             ) as $tasks
             | "<!-- "+($state | tostring)+" -->\n# "+$title+"\n\n"+$tasks+"\n\n"+$message
             '
-        )"
+        )
 
-        if "$(echo "$issue" | jq --arg username "$username" '.comments | any (.author.login == $username)')"; then
-          gh api \
-            --method PATCH \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$REPOSITORY/issues/comments/$(gh api -H "Accept: application/vnd.github+json" "/repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments" | jq --arg username $username 'select(.[].user.login == $username)[0].id')" \
-            -f body="$body"
-        else
-          gh issue comment $ISSUE_NUMBER --repo "$REPOSITORY" --body "$body"
-        fi
+        gh issue comment $ISSUE_NUMBER --repo "$REPOSITORY" --body "$body"
