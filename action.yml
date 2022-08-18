@@ -116,9 +116,8 @@ runs:
         ERROR: ${{ inputs.error }}
         AUTO_CLOSE: ${{ inputs.auto-close }}
       run: |
-        username=$(gh api -H "Accept: application/vnd.github+json" /user --jq '.login') &
+        username=$(gh api -H "Accept: application/vnd.github+json" /user --jq '.login')
         title=$(gh issue view "$ISSUE_NUMBER" --repo "$REPOSITORY" --json title --jq '.title')
-        wait
         eval "$(
           gh issue list \
             --repo "$REPOSITORY" \
@@ -138,62 +137,34 @@ runs:
                 | select(. != "")
               ]
             ) as $task_names
-            |
-            (
-              [
-                .[]
-                | select(.number == (env.ISSUE_NUMBER | fromjson))
-              ]
-              | if (length == 0) then []
-                else (
-                  .[0]
-                  |
-                  [
-                    .comments[]
-                    | select(
-                        .author.login == $username
-                        and (.body | startswith("<!-- [{"))
-                      )
-                  ]
-                  | if (length == 0) then []
-                    else (
-                      .[0]
-                      | .body
-                      | split(" -->")[0] 
-                      | ltrimstr("<!-- ")
-                      | fromjson
-                    ) end
-                ) end
-            ) as $state
+            | ($task_names | length) as $task_count 
             |
             [
-              .[] 
-              | select(.title == $title) 
-              | .comments[] 
+              .[]
+              | select(.title == $title)
+              | .comments[]
               | select(
                   .author.login == $username
-                  and (.body | startswith("<!-- [{"))
+                  and (.body | startswith("<!-- {"))
                 )
-              | .body 
-              | split(" -->")[0] 
+              | .body
+              | split(" -->")[0]
               | ltrimstr("<!-- ")
               | fromjson
               | select(
-                  .[-1].status == "success"
-                  and [.[-1].tasks[].name] == $task_names
+                  .status == "success"
+                  and [.tasks[].name] == $task_names
                   and all(
-                    .[-1].tasks[]; 
+                    .tasks[]; 
                     .status == "success"
                     and .started > -1
                     and .stopped > -1
                   )
                 )
             ][:5] as $successful_previous_states
-            | ($task_names | length) as $task_count 
             | ($successful_previous_states | length) as $successful_previous_state_count
             | (now | floor) as $now
-            | $state 
-            | . += [{
+            | {
                 "status": "in_progress", 
                 "started": $now,
                 "updated": $now,
@@ -222,7 +193,6 @@ runs:
                     [
                       $successful_previous_states
                       | .[]
-                      | .[-1]
                       | .stopped - .started
                     ]
                     | add / $successful_previous_state_count
@@ -253,7 +223,7 @@ runs:
                             [
                               $successful_previous_states
                               | .[]
-                              | .[-1].tasks[$i]
+                              | .tasks[$i]
                               | .stopped - .started
                             ]
                             | add / $successful_previous_state_count
@@ -263,9 +233,8 @@ runs:
                       }
                   )
                 )
-              }]
+              }
             | . as $state
-            | .[-1]
             | .status as $status
             | .title_in_progress as $title
             | (
@@ -291,7 +260,7 @@ runs:
                 .tasks[]
                 | .name as $name
                 | .status as $task_status
-                | ($state | .[-1] | .["status_label_"+$task_status]) as $status_label
+                | ($state["status_label_"+$task_status]) as $status_label
                 | (
                   if .duration_estimate > -1 then (
                     (.duration_estimate | tostring) as $duration_estimate_str
