@@ -19,6 +19,10 @@ inputs:
   tasks:
     description: Tasks
     required: true
+  start:
+    description: Start progress immediately
+    required: false
+    default: 'true'
   task-format:
     description: Task format
     required: false
@@ -31,18 +35,26 @@ inputs:
     description: Format of task duration estimate
     required: false
     default: (about ${DURATION_ESTIMATE}s)
+  title-waiting:
+    description: Title to display while waiting to start
+    required: false
+    default: Queued
   title-in-progress:
-    description: Title to display over tasks while in progress
+    description: Title to display while tasks are in progress
     required: false
     default: In Progress
   title-success:
-    description: Title to display after all tasks are marked successful
+    description: Title to display after successful completion of all tasks
     required: false
     default: Done
   title-failure:
     description: Title to display after a task fails
     required: false
     default: Failed
+  message-waiting:
+    description: Message to display while waiting to start
+    required: false
+    default: The tasks have been queued.
   message-in-progress:
     description: Message to display while tasks are in progress
     required: false
@@ -63,8 +75,8 @@ inputs:
     description: Status label for waiting task
     required: false
     default: ':radio_button:'
-  status-label-running:
-    description: Status label for running task
+  status-label-in-progress:
+    description: Status label for task in progress
     required: false
     default: ':cyclone:'
   status-label-success:
@@ -98,18 +110,21 @@ runs:
         ISSUE_NUMBER: ${{ inputs.issue-number }}
         REPOSITORY: ${{ inputs.repository }}
         TASKS: ${{ inputs.tasks }}
+        START: ${{ inputs.start == 'true' }}
         TASK_FORMAT: ${{ inputs.task-format }}
         DURATION_FORMAT: ${{ inputs.duration-format }}
         DURATION_ESTIMATE_FORMAT: ${{ inputs.duration-estimate-format }}
+        TITLE_WAITING: ${{ inputs.title-waiting }}
         TITLE_IN_PROGRESS: ${{ inputs.title-in-progress }}
         TITLE_SUCCESS: ${{ inputs.title-success }}
         TITLE_FAILURE: ${{ inputs.title-failure }}
+        MESSAGE_WAITING: ${{ inputs.message-waiting }}
         MESSAGE_IN_PROGRESS: ${{ inputs.message-in-progress }}
         MESSAGE_IN_PROGRESS_DURATION_ESTIMATE: ${{ inputs.message-in-progress-duration-estimate }}
         MESSAGE_SUCCESS: ${{ inputs.message-success }}
         MESSAGE_FAILURE: ${{ inputs.message-failure }}
         STATUS_LABEL_WAITING: ${{ inputs.status-label-waiting }}
-        STATUS_LABEL_RUNNING: ${{ inputs.status-label-running }}
+        STATUS_LABEL_IN_PROGRESS: ${{ inputs.status-label-in-progress }}
         STATUS_LABEL_SUCCESS: ${{ inputs.status-label-success }}
         STATUS_LABEL_FAILURE: ${{ inputs.status-label-failure }}
         STATUS_LABEL_CANCELLED: ${{ inputs.status-label-cancelled }}
@@ -164,8 +179,9 @@ runs:
             ][:5] as $successful_previous_states
             | ($successful_previous_states | length) as $successful_previous_state_count
             | (now | floor) as $now
+            | (env.START | fromjson) as $start
             | {
-                "status": "in_progress", 
+                "status": if $start then "in_progress" else "waiting" end, 
                 "started": $now,
                 "updated": $now,
                 "stopped": -1,
@@ -174,15 +190,17 @@ runs:
                 "task_format": env.TASK_FORMAT,
                 "duration_format": env.DURATION_FORMAT,
                 "duration_estimate_format": env.DURATION_ESTIMATE_FORMAT,
+                "title_waiting": env.TITLE_WAITING,
                 "title_in_progress": env.TITLE_IN_PROGRESS,
                 "title_success": env.TITLE_SUCCESS,
                 "title_failure": env.TITLE_FAILURE,
+                "message_waiting": env.MESSAGE_WAITING,
                 "message_in_progress": env.MESSAGE_IN_PROGRESS,
                 "message_in_progress_duration_estimate": env.MESSAGE_IN_PROGRESS_DURATION_ESTIMATE,
                 "message_success": env.MESSAGE_SUCCESS,
                 "message_failure": env.MESSAGE_FAILURE,
                 "status_label_waiting": env.STATUS_LABEL_WAITING,
-                "status_label_running": env.STATUS_LABEL_RUNNING,
+                "status_label_in_progress": env.STATUS_LABEL_IN_PROGRESS,
                 "status_label_success": env.STATUS_LABEL_SUCCESS,
                 "status_label_failure": env.STATUS_LABEL_FAILURE,
                 "status_label_cancelled": env.STATUS_LABEL_CANCELLED,
@@ -208,12 +226,12 @@ runs:
                       {
                         "name": $name,
                         "status": (
-                          if $i == 0
-                          then "running"
+                          if ($start and $i == 0)
+                          then "in_progress"
                           else "waiting" end
                         ),
                         "started": (
-                          if $i == 0 then $now else -1 end
+                          if ($start and $i == 0) then $now else -1 end
                         ),
                         "stopped": -1,
                         "duration_estimate": (
@@ -236,18 +254,24 @@ runs:
               }
             | . as $state
             | .status as $status
-            | .title_in_progress as $title
             | (
-              .duration_estimate as $duration_estimate
-              | if $duration_estimate > -1 then (
-                .message_in_progress + " " + (
-                  ($duration_estimate | tostring) as $duration_estimate_str
-                  | .message_in_progress_duration_estimate
-                  | gsub("\\\${DURATION_ESTIMATE}"; $duration_estimate_str)
-                  | gsub("\\\$DURATION_ESTIMATE"; $duration_estimate_str)
-                )
+              if $start then .title_in_progress else .title_waiting end
+            ) as $title
+            | (
+              if $start then (
+                .duration_estimate as $duration_estimate
+                | if $duration_estimate > -1 then (
+                  .message_in_progress + " " + (
+                    ($duration_estimate | tostring) as $duration_estimate_str
+                    | .message_in_progress_duration_estimate
+                    | gsub("\\\${DURATION_ESTIMATE}"; $duration_estimate_str)
+                    | gsub("\\\$DURATION_ESTIMATE"; $duration_estimate_str)
+                  )
+                ) else (
+                  .message_in_progress
+                ) end
               ) else (
-                .message_in_progress
+                .message_waiting
               ) end
             ) as $message
             | 
