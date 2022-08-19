@@ -182,7 +182,7 @@ runs:
             | (env.START | fromjson) as $start
             | {
                 "status": (if $start then "in_progress" else "waiting" end), 
-                "started": $now,
+                "started": (if $start then $now else -1 end),
                 "updated": $now,
                 "stopped": -1,
                 "error": env.ERROR,
