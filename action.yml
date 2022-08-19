@@ -140,43 +140,44 @@ runs:
             --state all \
             --search "$title in:title commenter:$username" \
           | jq \
+            --slurp \
             -r \
             --arg title "$title" \
             --arg username "$username" \
             $'
-            (
-              env.TASKS
-              | split("\n")
-              | [
-                .[]
-                | select(. != "")
-              ]
-            ) as $task_names
+              (
+                env.TASKS
+                | split("\n")
+                | [
+                    .[]
+                    | select(. != "")
+                  ]
+              ) as $task_names
             | ($task_names | length) as $task_count 
-            |
-            [
-              .[]
-              | select(.title == $title)
-              | .comments[]
-              | select(
-                  .author.login == $username
-                  and (.body | startswith("<!-- {"))
-                )
-              | .body
-              | split(" -->")[0]
-              | ltrimstr("<!-- ")
-              | fromjson
-              | select(
-                  .status == "success"
-                  and [.tasks[].name] == $task_names
-                  and all(
-                    .tasks[]; 
-                    .status == "success"
-                    and .started > -1
-                    and .stopped > -1
+            | [
+                .[]
+                | .[]
+                | select(.title == $title)
+                | .comments[]
+                | select(
+                    .author.login == $username
+                    and (.body | startswith("<!-- {"))
                   )
-                )
-            ][:5] as $successful_previous_states
+                | .body
+                | split(" -->")[0]
+                | ltrimstr("<!-- ")
+                | fromjson
+                | select(
+                    .status == "success"
+                    and [.tasks[].name] == $task_names
+                    and all(
+                      .tasks[]; 
+                      .status == "success"
+                      and .started > -1
+                      and .stopped > -1
+                    )
+                 )
+              ][:5] as $successful_previous_states
             | ($successful_previous_states | length) as $successful_previous_state_count
             | (now | floor) as $now
             | (env.START | fromjson) as $start
@@ -222,8 +223,7 @@ runs:
                   | map(
                     . as $i
                     | $task_names[$i] as $name
-                    | 
-                      {
+                    | {
                         "name": $name,
                         "status": (
                           if ($start and $i == 0)
